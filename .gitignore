@@ -1,0 +1,8 @@
+# 仮想環境フォルダ
+venv/
+env/
+.env
+
+# Pythonの一時ファイル
+__pycache__/
+*.pyc
