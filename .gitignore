@@ -10,3 +10,4 @@ __pycache__/
 #Googleの認証情報
 client_secret*.json
 credentials.json
+token.json
