@@ -6,3 +6,7 @@ env/
 # Pythonの一時ファイル
 __pycache__/
 *.pyc
+
+#Googleの認証情報
+client_secret*.json
+credentials.json
