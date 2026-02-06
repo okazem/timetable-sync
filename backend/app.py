@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import RedirectResponse
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from google_auth_oauthlib.flow import Flow
 
@@ -15,7 +16,25 @@ CREDENTIALS_FILE = 'credentials.json'
 REDIRECT_URI = 'http://localhost:8000/auth'
 
 app = FastAPI()
+
+origins = [
+    "http://localhost:5173",  # React(Vite)のデフォルトポート
+    "http://localhost:3000",  # 一般的なReactのポート
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 app.add_middleware(SessionMiddleware, secret_key='secret-key')
+
+@app.get('/')
+def index():
+    return "<url>test</url>"
 
 @app.get("/login")
 def login(request: Request):
@@ -34,7 +53,7 @@ def login(request: Request):
     return RedirectResponse(authorization_url)
 
 @app.get("/auth")
-async def auth(request: Request):
+def auth(request: Request):
     state = request.session.get('state')
     if not state:
         raise HTTPException(status_code=400, detail="State missing in session")
@@ -53,6 +72,9 @@ async def auth(request: Request):
         raise HTTPException(status_code=400, detail=f"Token exchange failed: {e}")
 
     credentials = flow.credentials
+
+    if credentials.refresh_token == None:
+        return HTTPException(status_code=400, detail=f"")
 
     request.session["credentials"] = {
         "token": credentials.token,
