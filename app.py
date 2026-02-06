@@ -1,73 +1,66 @@
-import datetime
-import os.path
+import os
+import uvicorn
+import json
+from datetime import datetime
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import RedirectResponse
+from starlette.middleware.sessions import SessionMiddleware
+from google_auth_oauthlib.flow import Flow
 
-from google.auth.transport.requests import Request
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-# If modifying these scopes, delete the file token.json.
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
+CREDENTIALS_FILE = 'credentials.json'
+REDIRECT_URI = 'http://localhost:8000/auth'
 
 app = FastAPI()
+app.add_middleware(SessionMiddleware, secret_key='secret-key')
 
+@app.get("/login")
+def login(request: Request):
+    flow = Flow.from_client_secrets_file(
+        CREDENTIALS_FILE,
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI
+    )
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
+    # セッションにstateを保存
+    request.session['state'] = state
+    return RedirectResponse(authorization_url)
 
-def main():
-  """Shows basic usage of the Google Calendar API.
-  Prints the start and name of the next 10 events on the user's calendar.
-  """
-  creds = None
-  # token.jsonがあるなら読み込む
-  if os.path.exists("token.json"):
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
-  # If there are no (valid) credentials available, let the user log in.
-  if not creds or not creds.valid:
-    if creds and creds.expired and creds.refresh_token:
-      creds.refresh(Request())
-    else:
-      flow = InstalledAppFlow.from_client_secrets_file(
-          "credentials.json", SCOPES
-      )
-      creds = flow.run_local_server(port=0)
-    # Save the credentials for the next run
-    with open("token.json", "w") as token:
-      token.write(creds.to_json())
+@app.get("/auth")
+async def auth(request: Request):
+    state = request.session.get('state')
+    if not state:
+        raise HTTPException(status_code=400, detail="State missing in session")
 
-  try:
-    service = build("calendar", "v3", credentials=creds)
+    flow = Flow.from_client_secrets_file(
+        CREDENTIALS_FILE,
+        scopes=SCOPES,
+        redirect_uri=REDIRECT_URI,
+        state=state # stateを渡して検証
+    )
 
-    tomorrow = datetime.datetime.now().date() + datetime.timedelta(days=1)
-    start_time = f"{tomorrow}T09:00:00"
-    end_time = f"{tomorrow}T10:30:00"
+    # 認可コードからトークンを取得
+    try:
+        flow.fetch_token(authorization_response=str(request.url))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Token exchange failed: {e}")
 
-    event = {
-      "summary": "テスト授業",
-      "location": "テスト教室",
-      "start": {
-        'dateTime': start_time,
-        'timeZone': 'Asia/Tokyo',
-      },
-      'end': {
-            'dateTime': end_time,
-            'timeZone': 'Asia/Tokyo',
-        },
-        'reminders': {
-            'useDefault': False,
-            'overrides': [
-            {'method': 'popup', 'minutes': 10}]
-        }
+    credentials = flow.credentials
+
+    request.session["credentials"] = {
+        "token": credentials.token,
+        "refresh_token": credentials.refresh_token,
+        "token_uri": credentials.token_uri,
+        "client_id": credentials.client_id,
+        "client_secret": credentials.client_secret,
+        "scopes": credentials.scopes,
     }
 
-    event_result = service.events().insert(calendarId='primary', body=event).execute()
-
-    print(event_result)
-
-  except HttpError as error:
-    print(f"An error occurred: {error}")
-
-
-if __name__ == "__main__":
-  main()
+    return {"message": "ログインに成功しました。カレンダー操作が可能です。"}
