@@ -9,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from google_auth_oauthlib.flow import Flow
 
+import database
+
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 SCOPES = ["https://www.googleapis.com/auth/calendar"]
