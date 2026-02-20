@@ -1,0 +1,16 @@
+# 仮想環境フォルダ
+venv/
+env/
+.env
+
+# Pythonの一時ファイル
+__pycache__/
+**/*.pyc
+
+#Googleの認証情報
+backend/client_secret*.json
+backend/credentials.json
+backend/token.json
+
+#database
+backend/timetable.db
