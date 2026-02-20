@@ -135,4 +135,4 @@ def dashboard(request: Request,db: Session = Depends(get_db)):
     user_info = db.query(UserToken).get(user_id)
     user_name = user_info.user_name
 
-    return user_name if user_name is not None else "USER"
+    
